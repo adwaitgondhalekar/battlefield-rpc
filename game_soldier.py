@@ -5,10 +5,12 @@ import os
 
 missile_incoming = None # shared missile queue containing current missile
 soldier_speed_list = []
-battlefield = [] # N*N grid representing the soldier positions on the battlefield
+battlefield = [] # N*N grid representing the soldier positions on the battlefield -> 0 = empty, 1 = soldier/commander, 2 = dead soldier/commander
 soldier_position_list = []
 missile_impact_map = {"M1" : 1, "M2" : 2, "M3" : 3, "M4" : 4}
 missile_impact_grid = []
+commander = None
+liveness_list = [] # 1 = ailve, 0 = dead
 
 N, M, t, T = None, None, None, None
 
@@ -35,6 +37,7 @@ def take_shelter(soldier_num):
     if len(available_pos) == 0:
         # kill the soldier process
         battlefield[x][y] = 2
+        liveness_list[soldier_num] = 0 # mark soldier as dead
         return
 
 
@@ -47,12 +50,12 @@ def take_shelter(soldier_num):
     battlefield[new_pos_x][new_pos_y] = 1 # marked soldier's new position in battlefield
 
 def soldier(soldier_num, lock):
-    global misslie_queue
+    global battlefield, soldier_position_list, missile_incoming
     
     while True:
 
         x, y = soldier_position_list[soldier_num]
-        if battlefield[x][y] == 2:
+        if battlefield[x][y] == 2 or soldier_num == commander:
             break
 
         while missile_incoming == None:
@@ -62,7 +65,7 @@ def soldier(soldier_num, lock):
         take_shelter(soldier_num)
         lock.release()
     
-def missile_approaching(pos, hit_time, missile_type):
+def missile_approaching(pos, hit_time, missile_type): # rpc 
     global missile_incoming
     missile = Missile(pos, hit_time, missile_type)
     
@@ -81,19 +84,44 @@ def missile_approaching(pos, hit_time, missile_type):
 
     missile_incoming = missile
 
-def status(soldier_ID): # does not return any value
+def status(soldier_ID): # rpc # does not return any value
     # check bitmap whether soldier was hit
-    true_flag = 
+    true_flag = liveness_list[soldier_ID] == 0
     was_hit(soldier_ID, true_flag) # written at server side
+
+def elect_commander(): # rpc # returns commander position and speed
+    global commander
+
+    alive_index = []
+    for i in range(len(liveness_list)):
+        if liveness_list[i] == 1:
+            alive_index.append(i)
+    
+    random.seed(round(time.time()))
+    commander = random.choice(alive_index)
+
+    return commander, soldier_position_list[commander][0], soldier_position_list[commander][1], soldier_speed_list[commander]
 
 def start_exec():
     global N, M, t, T
-    global soldier_speed_list, soldier_position_list, battlefield, missile_impact_grid, soldier_list
+    global soldier_speed_list, soldier_position_list, battlefield, missile_impact_grid, soldier_list, commander, liveness_list
     
+    # input hyperparameters
     N, M, t, T = os.sys.argv[0], os.sys.argv[1], os.sys.argv[2], os.sys.argv[3]
     soldier_speed_list = [os.sys.arg(i + 4) for i in range(M)]
+    
+    #verifying input
+    try:
+        assert N > 0 and M in range(0, N * N + 1) and t > 0 and T >= t
+        for i in range(M):
+            assert soldier_speed_list[i] in range(0, 4 + 1)
+    except AssertionError:
+        print("WRONG HYPERPARAMETERS !\nRUN PROGRAM AGAIN")
+        #terminate program
+
     battlefield = [[0 for i in range(N)] for j in range(N)]
     missile_impact_grid = [[1 for i in range(N)] for j in range(N)]
+    liveness_list = [1 for i in range(M)]
     
     # assign random positions to each soldier, ensuring NO 2 soldiers at the same position 
     while len(soldier_position_list) < M:
@@ -104,26 +132,17 @@ def start_exec():
             soldier_position_list.add((temp_x, temp_y))
     del temp_x, temp_y
     
+    # marking soldiers position in the battlefield
     for it in soldier_position_list:
-        battlefield[it[0]][it[1]] = 1 # marking soldiers position in the battlefield 
+        battlefield[it[0]][it[1]] = 1 
 
-    # elect commander
-    random.seed(round(time.time()))
-    commander = random.randint(0, M - 1)
     
     matrix_read_lock = multiprocessing.Lock()
     
     # list containing all processes and simultaneously status whether alive or not
-    soldier_list = [multiprocessing.Process(target = soldier, args = (i, matrix_read_lock)) if i != commander else None for i in range(M)]
+    soldier_list = [multiprocessing.Process(target = soldier, args = (i, matrix_read_lock)) for i in range(M)]
     
 if __name__ == "__main__":
     
-    proc1.start()
-    proc2.start()
-    
-    
-    proc1.join()
-    proc2.join()
-
-    print("Both Processes Completed!")
+    start_exec()
     
