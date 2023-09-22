@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+service Get_Position{
+    rpc get_position(position_all_request) returns (stream Soldier) {}
+}
+
+message position_all_request{
+
+}
+
+message Soldier{
+    int64 soldier_num = 1;
+    int64 x_pos = 2;
+    int64 y_pos = 3;
+}

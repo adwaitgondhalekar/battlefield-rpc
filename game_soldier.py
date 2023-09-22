@@ -5,6 +5,10 @@ import os
 import grpc
 import elect_commander_pb2 
 import elect_commander_pb2_grpc as rpc1
+import get_position_pb2
+import get_position_pb2_grpc as rpc2
+import get_hyperparameters_pb2
+import get_hyperparameters_pb2_grpc as rpc3
 from concurrent import futures
 
 class Missile:
@@ -12,6 +16,21 @@ class Missile:
         self.pos = pos
         self.hit_time = hit_time
         self.missile_type = missile_type
+
+class Soldier:
+    def __init__(self, soldier_id : int, x_pos : int, y_pos : int) -> None:
+        self.soldier_id = soldier_id
+        self.x_pos = x_pos
+        self.y_pos = y_pos
+
+class Get_HyperParams(rpc3.Get_HyperParamsServicer):
+    def get_hyperparams(self, request, context):
+        return get_hyperparameters_pb2.hyperparams(N = N, M = M, t = t, T = T)
+
+class Get_Position(rpc2.Get_PositionServicer):
+    def get_position(self, request, context):
+        for i in range(M):
+            yield get_position_pb2.Soldier(soldier_num = i, x_pos = soldier_position_list[i][0], y_pos = soldier_position_list[i][1])
 
 class Elector(rpc1.ElectorServicer):
     def elect_commander(self, request, context): # rpc # returns commander position and speed
@@ -32,14 +51,15 @@ missile_incoming = None # shared missile queue containing current missile
 soldier_speed_list = []
 battlefield = [] # N*N grid representing the soldier positions on the battlefield -> 0 = empty, 1 = soldier/commander, 2 = dead soldier/commander
 soldier_position_list = []
+soldier_object_list = []
 missile_impact_map = {"M1" : 1, "M2" : 2, "M3" : 3, "M4" : 4}
 missile_impact_grid = []
 commander = None
 liveness_list = [] # 1 = ailve, 0 = dead
 N, M, t, T = None, None, None, None
 servers = []
-no_of_rpc = 1
-rpc_list = [(Elector(), '[::]:50051', rpc1.add_ElectorServicer_to_server)]
+no_of_rpc = 3
+rpc_list = [(Elector(), '[::]:50051', rpc1.add_ElectorServicer_to_server), (Get_Position(), '[::]:50052', rpc2.add_Get_PositionServicer_to_server), (Get_HyperParams(), '[::]:50053', rpc3.add_Get_HyperParamsServicer_to_server)]
 game_start_time = None
 
 def take_shelter(soldier_num):
@@ -111,7 +131,7 @@ def status(soldier_ID): # rpc # does not return any value
 
 def start_exec():
     global N, M, t, T
-    global soldier_speed_list, soldier_position_list, battlefield, missile_impact_grid, soldier_list, commander, liveness_list, game_start_time
+    global soldier_speed_list, soldier_position_list, battlefield, missile_impact_grid, soldier_list, commander, liveness_list, game_start_time, soldier_object_list
     
     # input hyperparameters
     N, M, t, T = int(os.sys.argv[1]), int(os.sys.argv[2]), int(os.sys.argv[3]), int(os.sys.argv[4])
@@ -148,6 +168,10 @@ def start_exec():
     
     matrix_read_lock = multiprocessing.Lock()
     
+    soldier_object_list = [Soldier(i, soldier_position_list[i][0], soldier_position_list[i][1]) for i in range(M)]
+    for i in soldier_object_list:
+        print("SOLDIER NUMBER = {}, X={}, Y={}".format(i.soldier_id, i.x_pos, i.y_pos))
+
     # list containing all processes and simultaneously status whether alive or not
     soldier_list = [multiprocessing.Process(target = soldier, args = (i, matrix_read_lock)) for i in range(M)]
     for i in soldier_list:
@@ -177,5 +201,8 @@ def start_exec():
     
 if __name__ == "__main__":
     
-    start_exec()
+    try:
+        start_exec()
+    except KeyboardInterrupt:
+        pass
     print("program end")
