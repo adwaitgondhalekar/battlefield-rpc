@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+service Get_Valid_Position{
+    rpc get_valid_position(stream available_positions) returns (valid_position){}
+}
+
+message available_positions{
+    int64 x_pos = 1;
+    int64 y_pos = 2;
+}
+
+message valid_position{
+    int64 valid_x_pos = 1;
+    int64 valid_y_pos = 2;
+}
