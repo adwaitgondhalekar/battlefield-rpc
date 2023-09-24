@@ -7,6 +7,8 @@ import missile_approaching_pb2
 import missile_approaching_pb2_grpc
 import get_params_client_pb2
 import get_params_client_pb2_grpc as rpc2
+import all_taken_shelter_pb2
+import all_taken_shelter_pb2_grpc
 
 from concurrent import futures
 
@@ -22,33 +24,44 @@ missile_type_list = ["M1", "M2", "M3", "M4"]
 
 no_of_rpc = 2
 servers = []
-
-commander_x_pos = soldier_position_list[commander_index][0]
-commander_y_pos = soldier_position_list[commander_index][1]
-
+static_soldier_count = None
+dynamic_take_shelter_count = None
+dead_count_one_missile = 0
+commander_x_pos, commander_y_pos = None, None
+missile_fired = False
 missile_impact_dict = {"M1" : 1, "M2" : 2, "M3" : 3, "M4" : 4}
 missile_impact_grid = []
+params_sent = False
 
 class Get_Params_Client(rpc2.Get_Params_ClientServicer):
     def get_params_client(self, request, context):
-        return get_params_client_pb2.params_response(N = N)
+
+        global params_sent
+        params_sent = True
+        return get_params_client_pb2.params_response(N = N, M = M)
 
 class Get_Valid_Position(rpc1.Get_Valid_PositionServicer):
+
     def get_valid_position(self, request_iterator, context):
+        global dynamic_take_shelter_count, dead_count_one_missile
         final_x_pos, final_y_pos = -1, -1
         for positions in request_iterator:
-            x_pos, y_pos = positions[0], positions[1]
+            x_pos, y_pos = positions.x_pos, positions.y_pos
 
             if battlefield[x_pos][y_pos] in [1, 3] :
                 continue
             else:
                 final_x_pos, final_y_pos = x_pos, y_pos
+                print("INside valid pos")
                 break
         
-        response = get_valid_position_pb2.valid_position(valid_x_pos = final_x_pos, valid_y_pos = final_y_pos)
-
-        return response  # commander returning a valid position where soldier can take shelter
         
+        response = get_valid_position_pb2.valid_position(valid_x_pos = final_x_pos, valid_y_pos = final_y_pos)
+        return response  # commander returning a valid position where soldier can take shelter
+    
+    
+
+
 
 rpc_list = [(Get_Valid_Position(), '[::]:50051',rpc1.add_Get_Valid_PositionServicer_to_server), (Get_Params_Client(), '[::]:50052', rpc2.add_Get_Params_ClientServicer_to_server)]
 
@@ -166,7 +179,7 @@ def assign_initial_state():
 
 def elect_commander():
 
-    global commander_index
+    global commander_index, commander_x_pos, commander_y_pos
 
     print("GOT REQUEST TO ELECT COMMANDER")
 
@@ -179,6 +192,9 @@ def elect_commander():
     commander_index = random.choice(alive_index)
     x, y = soldier_position_list[commander_index][0], soldier_position_list[commander_index][1]
     battlefield[x][y] = 3   # marked commander in the battlefield
+
+    commander_x_pos = soldier_position_list[commander_index][0]
+    commander_y_pos = soldier_position_list[commander_index][1]
 
 def create_soldier_process():
     with grpc.insecure_channel('[::]:40051') as channel:
@@ -194,26 +210,47 @@ def create_soldier_process():
         response = stub.create_soldiers(soldier_list.__iter__())
         print(response.msg)
 
+def can_fire_missile():
+    with grpc.insecure_channel('[::]:40053') as channel:
+        stub = all_taken_shelter_pb2_grpc.All_Taken_ShelterStub(channel)
+
+        response = stub.all_taken_shelter(all_taken_shelter_pb2.taken_shelter_query())
+
+        return response.taken_shelter
+
 if __name__ == '__main__' :
 
     take_input()
+    static_soldier_count = M - 1
+    dynamic_take_shelter_count = 0
     assign_initial_state()      # initializing the grid with soldier position, commander not elected yet
     elect_commander()
-    create_soldier_process()
     create_servers()
+    while params_sent == False:
+        pass
+    time.sleep(2)
+    create_soldier_process()
+    
     start_timestamp = time.time()
     last_missile_timestamp = None
     while time.time() - start_timestamp <= T:
+
         if last_missile_timestamp != None and time.time() - last_missile_timestamp < t:
+            # print(round(time.time() - last_missile_timestamp))
             continue
+        
+        if can_fire_missile() == False:
+            continue
+        # time.sleep(1)
         create_missile()
+        
         new_x, new_y = take_shelter(commander_x_pos, commander_y_pos, commander_index) # first commander tries to take shelter
         
         # rpc call to missile_approaching
         with grpc.insecure_channel('[::]:40052') as channel:
             stub = missile_approaching_pb2_grpc.Missile_ApproachingStub(channel)
             stub.missile_approaching(missile_approaching_pb2.missile(x_pos = missile_x_pos, y_pos = missile_y_pos, hit_time = round(time.time() - start_timestamp), missile_type = missile_type))
-        
+            last_missile_timestamp = time.time()
         if new_x == -1:
             elect_commander()
 

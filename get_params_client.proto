@@ -7,4 +7,5 @@ message params_request{
 }
 message params_response{
     int64 N = 1;
+    int64 M = 2;
 }

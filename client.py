@@ -1,4 +1,4 @@
-import multiprocessing, grpc, random
+import multiprocessing, grpc, random, time
 from concurrent import futures
 import create_soldier_pb2
 import create_soldier_pb2_grpc as rpc1
@@ -8,17 +8,21 @@ import get_valid_position_pb2
 import get_valid_position_pb2_grpc
 import get_params_client_pb2
 import get_params_client_pb2_grpc
-
+import all_taken_shelter_pb2
+import all_taken_shelter_pb2_grpc as rpc3
 
 take_shelter_lock = multiprocessing.Lock()
 global_missile_count_lock = multiprocessing.Lock()
 missile_queue = multiprocessing.Queue()
-no_of_rpc = 2
+no_of_rpc = 3
 servers = []
 global_missile_count = multiprocessing.Queue()
 global_missile_count.put(0)
 
-static_soldier_count = 
+static_soldier_count = multiprocessing.Queue()
+dynamic_soldier_count = multiprocessing.Queue()
+
+
 
 # rpc to server to get a single valid position out of available positions for a soldier
 def valid_position_getter(available_pos):
@@ -28,12 +32,14 @@ def valid_position_getter(available_pos):
         available_pos_list = []
         for position in available_pos:
             available_pos_list.append(get_valid_position_pb2.available_positions(x_pos = position[0], y_pos = position[1]))
-        response = stub.create_soldiers(available_pos_list.__iter__())
+        response = stub.get_valid_position(available_pos_list.__iter__())
         return (response.valid_x_pos, response.valid_y_pos)
 
 
 
 def take_shelter(soldier_num, x_pos, y_pos, speed, missile_x_pos, missile_y_pos, missile_capacity):
+
+    print ("Soldier {} old position {} ".format(soldier_num, (x_pos, y_pos)))
 
     missile_impact_grid = [[1 for i in range(N)] for j in range(N)]
     # marking area of impact of missile
@@ -70,17 +76,15 @@ def take_shelter(soldier_num, x_pos, y_pos, speed, missile_x_pos, missile_y_pos,
         return (x_pos,y_pos) # soldier is safe
 
 
-def soldier_code(soldier_num, x_pos, y_pos, speed, take_shelter_lock, global_missile_count_lock):
+def soldier_code(soldier_num, x_pos, y_pos, speed, take_shelter_lock, global_missile_count, global_missile_count_lock, static_soldier_count, dynamic_soldier_count):
+    
     local_missile_count = 0
     print("soldier executing " + str(soldier_num))
 
     while True:
         
-        if x_pos == -1 :
-            print("soldier killed, terminating target function " + str(soldier_num))
-            break
         
-        global_missile_count_lock.aquire()
+        global_missile_count_lock.acquire()
         local_copy_global_missile_count = global_missile_count.get()
         global_missile_count.put(local_copy_global_missile_count)
         global_missile_count_lock.release()
@@ -94,8 +98,28 @@ def soldier_code(soldier_num, x_pos, y_pos, speed, take_shelter_lock, global_mis
 
             new_position = take_shelter(soldier_num, x_pos, y_pos, speed, missile_x_pos, missile_y_pos, missile_capacity)
             x_pos, y_pos = new_position
+
+            if x_pos == -1:
+                static_soldier_count.put(static_soldier_count.get() - 1)
+
+            dynamic_soldier_count.put(dynamic_soldier_count.get() - 1)
+
+            local_dynamic_temp = dynamic_soldier_count.get()
+
+            if local_dynamic_temp != 0:
+                missile_queue.put((missile_x_pos, missile_y_pos, hit_time, missile_type))
+                dynamic_soldier_count.put(local_dynamic_temp)
+            else:
+                local_static_temp = static_soldier_count.get()
+                dynamic_soldier_count.put(local_static_temp)
+                static_soldier_count.put(local_static_temp)
+
+            print ("Taking shelter - Soldier {} new position {} ".format(soldier_num, (x_pos, y_pos)))
             take_shelter_lock.release()
 
+            if x_pos == -1 :
+                print("soldier killed, terminating target function " + str(soldier_num))
+                break
         
     
 def create_servers():
@@ -112,35 +136,53 @@ def create_servers():
         
     print("All client side request servers started")
 
+
+class All_Taken_Shelter(rpc3.All_Taken_ShelterServicer):
+    def all_taken_shelter(self, request, context):
+        
+        response = all_taken_shelter_pb2.taken_shelter_response(taken_shelter = True if missile_queue.empty() else False)
+        return response
+
 class Missile_Approaching(rpc2.Missile_ApproachingServicer):
     def missile_approaching(self, request, context):
-        global_missile_count.put(global_missile_count.get() + 1)
+        print ("Missile Incoming !")
+        global_missile_count.put(global_missile_count.get() + 1) #incrementing global missile count
         missile_queue.put((request.x_pos, request.y_pos, request.hit_time, request.missile_type))
+
+        response = missile_approaching_pb2.missile_status()
+        return response
 
 class Create_Soldier(rpc1.Create_SoldierServicer):
 
     def create_soldiers(self, request_iterator, context):
 
+        
+
         for soldier in request_iterator:
 
-            multiprocessing.Process(target=soldier_code, args=(soldier.soldier_number, soldier.x_pos, soldier.y_pos, soldier.speed_capacity, take_shelter_lock, global_missile_count_lock)).start()
+            multiprocessing.Process(target=soldier_code, args=(soldier.soldier_number, soldier.x_pos, soldier.y_pos, soldier.speed_capacity, take_shelter_lock,global_missile_count, global_missile_count_lock, static_soldier_count, dynamic_soldier_count)).start()
 
         response = create_soldier_pb2.soldier_output(msg="Soldiers Created")
-
+        
         return response
 
-rpc_list = [(Create_Soldier(), '[::]:40051', rpc1.add_Create_SoldierServicer_to_server), (Missile_Approaching(), '[::]:40052', rpc2.add_Missile_ApproachingServicer_to_server)]
+rpc_list = [(Create_Soldier(), '[::]:40051', rpc1.add_Create_SoldierServicer_to_server), (Missile_Approaching(), '[::]:40052', rpc2.add_Missile_ApproachingServicer_to_server),(All_Taken_Shelter(),'[::]:40053',rpc3.add_All_Taken_ShelterServicer_to_server)]
 
 
 if __name__ == '__main__':
 
     create_servers()
+    
+    
     with grpc.insecure_channel('[::]:50052') as channel:
         stub = get_params_client_pb2_grpc.Get_Params_ClientStub(channel)
-        response = stub.get_params_client(get_params_client_pb2.params_requset())
+        response = stub.get_params_client(get_params_client_pb2.params_request())
 
         N = response.N
+        M = response.M
         
+    static_soldier_count.put(M - 1)
+    dynamic_soldier_count.put(M - 1)
     while True:
         pass
     

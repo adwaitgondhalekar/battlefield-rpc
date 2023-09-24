@@ -13,7 +13,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x17get_params_client.proto\"\x10\n\x0eparams_request\"\x1c\n\x0fparams_response\x12\t\n\x01N\x18\x01 \x01(\x03\x32M\n\x11Get_Params_Client\x12\x38\n\x11get_params_client\x12\x0f.params_request\x1a\x10.params_response\"\x00\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x17get_params_client.proto\"\x10\n\x0eparams_request\"\'\n\x0fparams_response\x12\t\n\x01N\x18\x01 \x01(\x03\x12\t\n\x01M\x18\x02 \x01(\x03\x32M\n\x11Get_Params_Client\x12\x38\n\x11get_params_client\x12\x0f.params_request\x1a\x10.params_response\"\x00\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -24,7 +24,7 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _globals['_PARAMS_REQUEST']._serialized_start=27
   _globals['_PARAMS_REQUEST']._serialized_end=43
   _globals['_PARAMS_RESPONSE']._serialized_start=45
-  _globals['_PARAMS_RESPONSE']._serialized_end=73
-  _globals['_GET_PARAMS_CLIENT']._serialized_start=75
-  _globals['_GET_PARAMS_CLIENT']._serialized_end=152
+  _globals['_PARAMS_RESPONSE']._serialized_end=84
+  _globals['_GET_PARAMS_CLIENT']._serialized_start=86
+  _globals['_GET_PARAMS_CLIENT']._serialized_end=163
 # @@protoc_insertion_point(module_scope)
