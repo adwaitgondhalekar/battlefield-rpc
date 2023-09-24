@@ -9,6 +9,8 @@ import get_params_client_pb2
 import get_params_client_pb2_grpc as rpc2
 import all_taken_shelter_pb2
 import all_taken_shelter_pb2_grpc
+import is_valid_position_pb2
+import is_valid_position_pb2_grpc as rpc3
 
 from concurrent import futures
 
@@ -22,7 +24,7 @@ battlefield = []
 soldier_position_list = []
 missile_type_list = ["M1", "M2", "M3", "M4"]
 
-no_of_rpc = 2
+no_of_rpc = 3
 servers = []
 static_soldier_count = None
 dynamic_take_shelter_count = None
@@ -40,6 +42,11 @@ class Get_Params_Client(rpc2.Get_Params_ClientServicer):
         params_sent = True
         return get_params_client_pb2.params_response(N = N, M = M)
 
+class Is_Valid_Position(rpc3.Is_Valid_PositionServicer):
+    def is_valid_position(self, request, context):
+        x_pos, y_pos = request.x_pos, request.y_pos
+        return is_valid_position_pb2.valid_or_not(is_safe = True if battlefield[x_pos][y_pos] not in [1, 3] else False)
+
 class Get_Valid_Position(rpc1.Get_Valid_PositionServicer):
 
     def get_valid_position(self, request_iterator, context):
@@ -52,7 +59,6 @@ class Get_Valid_Position(rpc1.Get_Valid_PositionServicer):
                 continue
             else:
                 final_x_pos, final_y_pos = x_pos, y_pos
-                print("INside valid pos")
                 break
         
         
@@ -63,7 +69,7 @@ class Get_Valid_Position(rpc1.Get_Valid_PositionServicer):
 
 
 
-rpc_list = [(Get_Valid_Position(), '[::]:50051',rpc1.add_Get_Valid_PositionServicer_to_server), (Get_Params_Client(), '[::]:50052', rpc2.add_Get_Params_ClientServicer_to_server)]
+rpc_list = [(Get_Valid_Position(), '[::]:50051',rpc1.add_Get_Valid_PositionServicer_to_server), (Get_Params_Client(), '[::]:50052', rpc2.add_Get_Params_ClientServicer_to_server), (Is_Valid_Position(), '[::]:50055', rpc3.add_Is_Valid_PositionServicer_to_server)]
 
 
 def create_servers():
@@ -218,6 +224,12 @@ def can_fire_missile():
 
         return response.taken_shelter
 
+def print_after_1_sec(val, print_timer):
+    if print_timer == None or time.time() - print_timer >= 1:
+        print(val, print_timer)
+        print_timer = time.time()
+    return print_timer
+
 if __name__ == '__main__' :
 
     take_input()
@@ -228,32 +240,40 @@ if __name__ == '__main__' :
     create_servers()
     while params_sent == False:
         pass
-    time.sleep(2)
+    # time.sleep(2) why ?
     create_soldier_process()
     
-    start_timestamp = time.time()
+    current_timestamp = t
     last_missile_timestamp = None
-    while time.time() - start_timestamp <= T:
 
-        if last_missile_timestamp != None and time.time() - last_missile_timestamp < t:
-            # print(round(time.time() - last_missile_timestamp))
+    john_wayne_timer, rambo_timer = None, None
+    a_timer, b_timer = None, None
+
+    while current_timestamp <= T:
+
+        if (last_missile_timestamp != None) and (time.time() - last_missile_timestamp < t):
+            john_wayne_timer = print_after_1_sec('john wayne', john_wayne_timer)
             continue
         
         if can_fire_missile() == False:
+            rambo_timer = print_after_1_sec('rambo', rambo_timer)
             continue
-        # time.sleep(1)
+        # time.sleep(1) why ?
+
+        print('basak', current_timestamp)
+        current_timestamp += t
         create_missile()
         
         new_x, new_y = take_shelter(commander_x_pos, commander_y_pos, commander_index) # first commander tries to take shelter
         
         # rpc call to missile_approaching
         with grpc.insecure_channel('[::]:40052') as channel:
+            a_timer = print_after_1_sec('inside grpc with', a_timer)
             stub = missile_approaching_pb2_grpc.Missile_ApproachingStub(channel)
-            stub.missile_approaching(missile_approaching_pb2.missile(x_pos = missile_x_pos, y_pos = missile_y_pos, hit_time = round(time.time() - start_timestamp), missile_type = missile_type))
+            stub.missile_approaching(missile_approaching_pb2.missile(x_pos = missile_x_pos, y_pos = missile_y_pos, hit_time = current_timestamp, missile_type = missile_type))
+            #time.sleep(0.5)
+            b_timer = print_after_1_sec('after grpc call', b_timer)
             last_missile_timestamp = time.time()
         if new_x == -1:
             elect_commander()
-
-
-
-
+    print("program ended")

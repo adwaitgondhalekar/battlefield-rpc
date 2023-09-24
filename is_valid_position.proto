@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+service Is_Valid_Position{
+    rpc is_valid_position(soldier_escape_position) returns (valid_or_not){}
+}
+
+message soldier_escape_position{
+    int64 x_pos = 1;
+    int64 y_pos = 2;
+}
+
+message valid_or_not{
+    bool is_safe = 1;
+}
