@@ -12,6 +12,8 @@ import all_taken_shelter_pb2
 import all_taken_shelter_pb2_grpc as rpc3
 import is_valid_position_pb2
 import is_valid_position_pb2_grpc
+import game_start_pb2
+import game_start_pb2_grpc
 
 take_shelter_lock = multiprocessing.Lock()
 global_missile_count_lock = multiprocessing.Lock()
@@ -26,26 +28,48 @@ take_shelter_queue = multiprocessing.Queue()
 static_soldier_count = multiprocessing.Queue()
 dynamic_soldier_count = multiprocessing.Queue()
 
+'''
+channel_list = {'get hyperparameters' : grpc.insecure_channel('[::]:50052'), 'single position query' : grpc.insecure_channel('[::]:50055'), 'multiple position query' : grpc.insecure_channel('[::]:50051')}
+stub_list = {'get hyperparameters' : get_params_client_pb2_grpc.Get_Params_ClientStub(channel_list["get hyperparameters"]), 'single position query' : is_valid_position_pb2_grpc.Is_Valid_PositionStub(channel_list["single position query"]), 'multiple position query' : get_valid_position_pb2_grpc.Get_Valid_PositionStub(channel_list['multiple position query'])}
+'''
 
+port_list = {'game start' : '[::]:50054', 'get hyperparameters' : '[::]:50052', 'single position query' : '[::]:50053', 'multiple position query' : '[::]:50051'}
+stub_list = {'game start' : game_start_pb2_grpc.Game_StartStub, 'get hyperparameters' : get_params_client_pb2_grpc.Get_Params_ClientStub, 'single position query' : is_valid_position_pb2_grpc.Is_Valid_PositionStub, 'multiple position query' : get_valid_position_pb2_grpc.Get_Valid_PositionStub}
 
-'''# rpc to server to get a single valid position out of available positions for a soldier
+# rpc to server to get a single valid position out of available positions for a soldier
 def valid_position_getter(available_pos):
-    with grpc.insecure_channel('[::]:50051') as channel:
-        stub = get_valid_position_pb2_grpc.Get_Valid_PositionStub(channel)
+    with grpc.insecure_channel(port_list["multiple position query"]) as channel:
+        stub = stub_list["multiple position query"](channel)
 
         available_pos_list = []
         for position in available_pos:
             available_pos_list.append(get_valid_position_pb2.available_positions(x_pos = position[0], y_pos = position[1]))
-        print("rpc call from take shelter() abc")
+        print("rpc call to commander to get_valid_position() abc")
         response = stub.get_valid_position(available_pos_list.__iter__())
-        return (response.valid_x_pos, response.valid_y_pos)'''
+    return (response.valid_x_pos, response.valid_y_pos)
+
+def start_game():
+    with grpc.insecure_channel(port_list["game start"]) as channel:
+        stub = stub_list["game start"](channel)
+        print("GAME START")
+        response = stub.start_game(game_start_pb2.game_start_request())
+        print("GAME START 2")
 
 def check_valid_position(x, y) -> bool :
-    with grpc.insecure_channel('[::]:50055') as channel:
-        stub = is_valid_position_pb2_grpc.Is_Valid_PositionStub(channel)
-        print("rpc call from take shelter() abc")
+    with grpc.insecure_channel(port_list["single position query"]) as channel:
+        stub = stub_list["single position query"](channel)
+        print("rpc call to commander to check_valid_position() abc")
         response = stub.is_valid_position(is_valid_position_pb2.soldier_escape_position(x_pos = x, y_pos = y))
-        return response.is_safe
+    return response.is_safe
+
+def get_hyperparameters():
+    global N, M
+    with grpc.insecure_channel(port_list["get hyperparameters"]) as channel:
+        stub = stub_list["get hyperparameters"](channel)
+        response = stub.get_params_client(get_params_client_pb2.params_request())
+        N = response.N
+        M = response.M
+        print("got hyperparameters inside function", N, M)
 
 def take_shelter(soldier_num, x_pos, y_pos, speed, missile_x_pos, missile_y_pos, missile_capacity):
 
@@ -84,6 +108,7 @@ def take_shelter(soldier_num, x_pos, y_pos, speed, missile_x_pos, missile_y_pos,
 
         new_pos_x, new_pos_y = -1, -1
         for i in available_pos:
+            get_hyperparameters()
             if check_valid_position(i[0], i[1]):
                 new_pos_x, new_pos_y = i
                 break
@@ -99,7 +124,7 @@ def take_shelter(soldier_num, x_pos, y_pos, speed, missile_x_pos, missile_y_pos,
 def soldier_code(soldier_num, x_pos, y_pos, speed, take_shelter_lock, global_missile_count, global_missile_count_lock, static_soldier_count, dynamic_soldier_count, take_shelter_queue):
     
     local_missile_count = 0
-    print("soldier executing " + str(soldier_num))
+    print("soldier executing " + str(soldier_num) + "at ",(x_pos,y_pos))
 
     while True:
         
@@ -149,7 +174,7 @@ def soldier_code(soldier_num, x_pos, y_pos, speed, take_shelter_lock, global_mis
 def create_servers():
 
     for i in range(no_of_rpc):
-        servers.append(grpc.server(futures.ThreadPoolExecutor(max_workers=1)))
+        servers.append(grpc.server(futures.ThreadPoolExecutor(max_workers=10)))
 
 
     for i, j in enumerate(rpc_list):
@@ -172,7 +197,7 @@ missile_number = 1
 class Missile_Approaching(rpc2.Missile_ApproachingServicer):
     def missile_approaching(self, request, context):
         global missile_number
-        print ("MISSILE {} INCOMING !".format(missile_number))
+        print ("MISSILE {} INCOMING at {}!".format(missile_number,(request.x_pos,request.y_pos)))
         missile_number += 1
         global_missile_count.put(global_missile_count.get() + 1) #incrementing global missile count
         missile_queue.put((request.x_pos, request.y_pos, request.hit_time, request.missile_type))
@@ -184,10 +209,7 @@ class Create_Soldier(rpc1.Create_SoldierServicer):
 
     def create_soldiers(self, request_iterator, context):
 
-        
-
         for soldier in request_iterator:
-
             multiprocessing.Process(target=soldier_code, args=(soldier.soldier_number, soldier.x_pos, soldier.y_pos, soldier.speed_capacity, take_shelter_lock,global_missile_count, global_missile_count_lock, static_soldier_count, dynamic_soldier_count, take_shelter_queue)).start()
 
         response = create_soldier_pb2.soldier_output(msg="Soldiers Created")
@@ -196,22 +218,18 @@ class Create_Soldier(rpc1.Create_SoldierServicer):
 
 rpc_list = [(Create_Soldier(), '[::]:40051', rpc1.add_Create_SoldierServicer_to_server), (Missile_Approaching(), '[::]:40052', rpc2.add_Missile_ApproachingServicer_to_server),(All_Taken_Shelter(),'[::]:40053',rpc3.add_All_Taken_ShelterServicer_to_server)]
 
-def get_hyperparameters():
-    global N, M
-    with grpc.insecure_channel('[::]:50052') as channel:
-        stub = get_params_client_pb2_grpc.Get_Params_ClientStub(channel)
-        response = stub.get_params_client(get_params_client_pb2.params_request())
-        N = response.N
-        M = response.M
-        print("got hyperparameters", N, M)
-
 if __name__ == '__main__':
 
     create_servers()
     get_hyperparameters()
+    print("got hyperparameters", N, M)
     get_hyperparameters()
+    print("got hyperparameters", N, M)
 
     static_soldier_count.put(M - 1)
     dynamic_soldier_count.put(M - 1)
+
+    #start_game()
+
     while True:
         pass

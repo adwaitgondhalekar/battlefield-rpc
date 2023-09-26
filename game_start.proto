@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+service Game_Start{
+    rpc start_game(game_start_request) returns (game_start_response) {}
+}
+
+message game_start_request{}
+
+message game_start_response{}
