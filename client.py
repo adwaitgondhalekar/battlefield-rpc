@@ -18,7 +18,7 @@ import game_over_pb2
 import game_over_pb2_grpc as rpc6
 from colorama import Fore, Back, Style
 
-others_ip_addr = '172.17.84.247'
+others_ip_addr = '172.17.84.246'
 own_ip_addr = '172.17.84.246'
 
 take_shelter_lock = multiprocessing.Lock()

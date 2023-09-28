@@ -17,7 +17,7 @@ import logging
 from concurrent import futures
 from colorama import Fore, Back, Style
 
-others_ip_addr = '172.17.84.247'
+others_ip_addr = '172.17.84.246'
 own_ip_addr = '172.17.84.246'
 
 N, M, t, T, commander_index, missile_x_pos, missile_y_pos, missile_type= None, None, None, None, None, None, None, None
@@ -415,8 +415,11 @@ def game_result():
 
 def log_live_soldiers():
     for i in range(len(liveness_list)):
-        if liveness_list[i] == 1:
+        
+        if soldier_position_list[i][0] != -1:
             logging.debug("Soldier {} is at {}".format(i, soldier_position_list[i]))
+        else:
+            logging.debug("Soldier {} is dead".format(i))
 
 if __name__ == '__main__' :
 
@@ -500,6 +503,7 @@ if __name__ == '__main__' :
         status_all()
     display_game()
 
+log_live_soldiers()
 call_game_over()
 
 while not(is_client_game_over):
