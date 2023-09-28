@@ -12,4 +12,5 @@ message taken_shelter_query
 message taken_shelter_response
 {
     bool taken_shelter = 1;
+    int64 live_soldier_count = 2;
 }

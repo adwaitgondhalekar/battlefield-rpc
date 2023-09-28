@@ -13,7 +13,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x17\x61ll_taken_shelter.proto\"\x15\n\x13taken_shelter_query\"/\n\x16taken_shelter_response\x12\x15\n\rtaken_shelter\x18\x01 \x01(\x08\x32Y\n\x11\x41ll_Taken_Shelter\x12\x44\n\x11\x61ll_taken_shelter\x12\x14.taken_shelter_query\x1a\x17.taken_shelter_response\"\x00\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x17\x61ll_taken_shelter.proto\"\x15\n\x13taken_shelter_query\"K\n\x16taken_shelter_response\x12\x15\n\rtaken_shelter\x18\x01 \x01(\x08\x12\x1a\n\x12live_soldier_count\x18\x02 \x01(\x03\x32Y\n\x11\x41ll_Taken_Shelter\x12\x44\n\x11\x61ll_taken_shelter\x12\x14.taken_shelter_query\x1a\x17.taken_shelter_response\"\x00\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -24,7 +24,7 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _globals['_TAKEN_SHELTER_QUERY']._serialized_start=27
   _globals['_TAKEN_SHELTER_QUERY']._serialized_end=48
   _globals['_TAKEN_SHELTER_RESPONSE']._serialized_start=50
-  _globals['_TAKEN_SHELTER_RESPONSE']._serialized_end=97
-  _globals['_ALL_TAKEN_SHELTER']._serialized_start=99
-  _globals['_ALL_TAKEN_SHELTER']._serialized_end=188
+  _globals['_TAKEN_SHELTER_RESPONSE']._serialized_end=125
+  _globals['_ALL_TAKEN_SHELTER']._serialized_start=127
+  _globals['_ALL_TAKEN_SHELTER']._serialized_end=216
 # @@protoc_insertion_point(module_scope)

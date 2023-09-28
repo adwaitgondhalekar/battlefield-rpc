@@ -7,6 +7,7 @@ service Get_Valid_Position{
 message available_positions{
     int64 x_pos = 1;
     int64 y_pos = 2;
+    int64 id = 3;
 }
 
 message valid_position{
