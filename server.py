@@ -12,13 +12,13 @@ import all_taken_shelter_pb2_grpc
 import status_pb2, status_pb2_grpc
 import send_commander_index_pb2, send_commander_index_pb2_grpc
 import game_over_pb2, game_over_pb2_grpc
+import logging
 
 from concurrent import futures
 from colorama import Fore, Back, Style
 
-ip_addr = '172.17.84.99'
-
-
+others_ip_addr = '172.17.84.247'
+own_ip_addr = '172.17.84.246'
 
 N, M, t, T, commander_index, missile_x_pos, missile_y_pos, missile_type= None, None, None, None, None, None, None, None
 soldier_speed_list = []
@@ -74,7 +74,8 @@ class Get_Valid_Position(rpc1.Get_Valid_PositionServicer):
         soldier_position_list[soldier_num] = (final_x_pos, final_y_pos)
         return response  # commander returning a valid position where soldier can take shelter
 
-rpc_list = [(Get_Valid_Position(), 'localhost:50051',rpc1.add_Get_Valid_PositionServicer_to_server), (Get_Params_Client(), 'localhost:50052', rpc2.add_Get_Params_ClientServicer_to_server)]
+# rpc_list = [(Get_Valid_Position(), 'localhost:50051',rpc1.add_Get_Valid_PositionServicer_to_server), (Get_Params_Client(), 'localhost:50052', rpc2.add_Get_Params_ClientServicer_to_server)]
+rpc_list = [(Get_Valid_Position(), own_ip_addr + ':50051',rpc1.add_Get_Valid_PositionServicer_to_server), (Get_Params_Client(), own_ip_addr + ':50052', rpc2.add_Get_Params_ClientServicer_to_server)]
 
 
 def create_servers():
@@ -113,6 +114,8 @@ def take_shelter(x, y, old_commander_index):
             # commander cannot save himself and will be killed
             battlefield[x][y] = 2
             liveness_list[old_commander_index] = 0 # marked soldier as dead
+            print("Commander is dead !")
+            logging.debug("Commander is dead !")
             # return (-1, -1)
             return
 
@@ -194,7 +197,7 @@ def assign_initial_state():
         battlefield[it[0]][it[1]] = 1 
 
 def call_game_over():
-    with grpc.insecure_channel(ip_addr + ':40056') as channel:
+    with grpc.insecure_channel(others_ip_addr + ':40056') as channel:
         global is_client_game_over
         stub = game_over_pb2_grpc.Game_OverStub(channel)
         response = stub.game_over(game_over_pb2.game_over_req())
@@ -207,6 +210,7 @@ def elect_commander():
     global commander_index
 
     print("GOT REQUEST TO ELECT COMMANDER")
+    logging.debug("GOT REQUEST TO ELECT COMMANDER")
 
     alive_index = []
     for soldier_index in range(len(liveness_list)):
@@ -216,6 +220,7 @@ def elect_commander():
     if len(alive_index) == 0: # no soldier is alive
         call_game_over()
         print("All Soldiers are Dead !")
+        logging.debug("All Soldiers are Dead !")
         return
 
     soldier_position_list[commander_index] = (-1, -1)
@@ -223,17 +228,17 @@ def elect_commander():
     commander_index = random.choice(alive_index)
 
     print("Soldier {} is elected as new commander".format(commander_index))
-    
+    logging.debug("Soldier {} elected as the commander".format(commander_index))
     x, y = soldier_position_list[commander_index][0], soldier_position_list[commander_index][1]
     battlefield[x][y] = 3   # marked commander in the battlefield
     
 def send_new_commander():
-    with grpc.insecure_channel(ip_addr + ':40055') as channel:
+    with grpc.insecure_channel(others_ip_addr + ':40055') as channel:
         stub = send_commander_index_pb2_grpc.Send_Commander_IndexStub(channel)
         response = stub.send_commander_index(send_commander_index_pb2.new_commander_index(commander_index = commander_index))
 
 def create_soldier_process():
-    with grpc.insecure_channel(ip_addr + ':40051') as channel:
+    with grpc.insecure_channel(others_ip_addr + ':40051') as channel:
         stub = create_soldier_pb2_grpc.Create_SoldierStub(channel)
 
         soldier_list = []
@@ -245,9 +250,10 @@ def create_soldier_process():
                 soldier_list.append(create_soldier_pb2.soldier_details(soldier_number = i, x_pos = soldier_position_list[i][0], y_pos = soldier_position_list[i][1], speed_capacity = soldier_speed_list[i]))
         response = stub.create_soldiers(soldier_list.__iter__())
         print(response.msg)
+        logging.debug("All sodliers created")
 
 def can_fire_missile():
-    with grpc.insecure_channel(ip_addr + ':40053') as channel:
+    with grpc.insecure_channel(others_ip_addr + ':40053') as channel:
         stub = all_taken_shelter_pb2_grpc.All_Taken_ShelterStub(channel)
         response = stub.all_taken_shelter(all_taken_shelter_pb2.taken_shelter_query())
         return response
@@ -256,7 +262,7 @@ def status_all():
     for i in range(M):
         if i == commander_index:
             continue
-        with grpc.insecure_channel(ip_addr + ':40054') as channel:
+        with grpc.insecure_channel(others_ip_addr + ':40054') as channel:
             stub = status_pb2_grpc.StatusStub(channel)
             response = stub.status(status_pb2.status_request(soldier_id = i))
         liveness_list[i] = 1 if response.alive else 0
@@ -380,7 +386,9 @@ def display_game():
         if i == 0:
             casualty_count += 1
     print("DEAD SOLDIERS :", temp_list_2)
+    logging.debug("DEAD SOLDIERS :" + str(temp_list_2))
     print("TOTAL CASUALTY COUNT IS - {}".format(casualty_count))
+    logging.debug("TOTAL CASUALTY COUNT IS - {}".format(casualty_count))
     temp_list.clear()
     print("")
     
@@ -400,15 +408,24 @@ def game_result():
 
     if player_percentage>50:
         print ("GAME WON AS {:.2f}% PLAYERS ALIVE !".format(player_percentage))
+        logging.debug("GAME WON AS {:.2f}% PLAYERS ALIVE !".format(player_percentage))
     else:
         print ("GAME LOST AS {:.2f}% PLAYERS ALIVE !".format(player_percentage))
+        logging.debug("GAME LOST AS {:.2f}% PLAYERS ALIVE !".format(player_percentage))
+
+def log_live_soldiers():
+    for i in range(len(liveness_list)):
+        if liveness_list[i] == 1:
+            logging.debug("Soldier {} is at {}".format(i, soldier_position_list[i]))
 
 if __name__ == '__main__' :
 
+    logging.basicConfig(filename='output.log', format='%(asctime)s %(message)s', level=logging.DEBUG)
     missile_one = False
     dead_list = []
     
     take_input()
+    logging.debug("Input taken from user N={}, M={}".format(N, M))
     missile_impact_grid = [[1 for i in range(N)] for j in range(N)]
     static_soldier_count = M - 1
     dynamic_take_shelter_count = 0
@@ -440,11 +457,14 @@ if __name__ == '__main__' :
             continue
         # time.sleep(1)
         # create logical timer
+        logging.debug("Time elapsed {} seconds".format(t))
+        print("Time elapsed {} seconds".format(t))
         game_timestamp += t
         
         status_all()
         if can_fire_missile_response.live_soldier_count != 0 and missile_one == True:
             print("After Evasion !")
+            log_live_soldiers()
             display_game()
         
         create_missile()
@@ -452,6 +472,7 @@ if __name__ == '__main__' :
 
         if can_fire_missile_response.live_soldier_count != 0:
             print("Before Evasion")
+            log_live_soldiers()
             print_missile_area()
         # commander re-election
 
@@ -465,12 +486,15 @@ if __name__ == '__main__' :
         
         # rpc call to missile_approaching
         if can_fire_missile_response.live_soldier_count != 0:
-            with grpc.insecure_channel(ip_addr + ':40052') as channel:
+            with grpc.insecure_channel(others_ip_addr + ':40052') as channel:
                 stub = missile_approaching_pb2_grpc.Missile_ApproachingStub(channel)
                 stub.missile_approaching(missile_approaching_pb2.missile(x_pos = missile_x_pos, y_pos = missile_y_pos, hit_time = round(time.time() - start_timestamp), missile_type = missile_type))
                 print("Missile Fired !")
+                logging.debug("Missile Fired !")
                 last_missile_timestamp = time.time()
         
+    logging.debug("Time elapsed {} seconds".format(t))
+    print("Time elapsed {} seconds".format(t))
 
     if can_fire_missile_response.live_soldier_count != 0:
         status_all()
@@ -484,3 +508,4 @@ time.sleep(5)    # so that game over rpc request reaches client and server.py cl
 
 game_result()
 print("GAME OVER !")
+logging.debug("GAME OVER !")
