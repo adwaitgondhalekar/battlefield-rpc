@@ -16,6 +16,7 @@ import send_commander_index_pb2
 import send_commander_index_pb2_grpc as rpc5
 import game_over_pb2
 import game_over_pb2_grpc as rpc6
+from colorama import Fore, Back, Style
 
 
 
@@ -106,9 +107,9 @@ def take_shelter(soldier_num, x_pos, y_pos, speed, missile_x_pos, missile_y_pos,
 def soldier_code(soldier_num, x_pos, y_pos, speed, take_shelter_lock, global_missile_count, static_soldier_count, dynamic_soldier_count, all_taken_shelter_queue, missile_queue, take_shelter_request_queue, take_shelter_response_queue, commander_index, is_game_over_2):
     
     local_missile_count = 0
-    print("Soldier {} created and currently situated at {} and hypeparameters {}".format(soldier_num, (x_pos, y_pos), (N, M)))
+    print("Soldier {} created and currently situated at {}".format(soldier_num, (x_pos, y_pos)))
+    print()
     
-    # chota_timer = None
     break_out_while = False
     while True:
 
@@ -211,13 +212,17 @@ def soldier_code(soldier_num, x_pos, y_pos, speed, take_shelter_lock, global_mis
 
             # all_taken_shelter_queue.get()  # soldier has completed its take_shelter
             take_shelter_lock.release()
-            print ("Soldier {} has taken shelter at {} ".format(soldier_num, (x_pos, y_pos)))
-            print()
+            if x_pos != -1:
+                print ("Soldier {} has taken shelter at {} ".format(soldier_num, (x_pos, y_pos)))
+                print()
+            
+                
             # take_shelter_lock.release()
 
             all_taken_shelter_queue.get()  # soldier has completed its take_shelter
             if x_pos == -1 :
-                print("Soldier {} will be killed".format(soldier_num))
+                print(Fore.RED + "Soldier {} cannot evade Missile and will be killed".format(soldier_num))
+                print(Style.RESET_ALL, end="", sep="")
                 print()
                 break
 
@@ -253,7 +258,8 @@ class All_Taken_Shelter(rpc3.All_Taken_ShelterServicer):
 
 class Missile_Approaching(rpc2.Missile_ApproachingServicer):
     def missile_approaching(self, request, context):
-        print ("Missile Incoming at {} !".format((request.x_pos, request.y_pos)))
+        print (Back.RED + Fore.WHITE+"Missile Incoming at {} !".format((request.x_pos, request.y_pos)), end="")
+        print(Style.RESET_ALL, end="", sep="")
         print()
         
         with global_missile_count.get_lock():

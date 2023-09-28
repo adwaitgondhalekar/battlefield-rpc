@@ -360,7 +360,7 @@ def print_layout():
     # print("{:—^{width}s}".format("", width = 8*N))
 
 def display_game():
-
+    casualty_count = 0
     print_layout()
     temp_list = []
     
@@ -376,7 +376,11 @@ def display_game():
             temp_list_2.append('C' + str(i))
 
     dead_list.extend(temp_list)
+    for i in liveness_list:
+        if i == 0:
+            casualty_count += 1
     print("DEAD SOLDIERS :", temp_list_2)
+    print("TOTAL CASUALTY COUNT IS - {}".format(casualty_count))
     temp_list.clear()
     print("")
     
@@ -403,6 +407,7 @@ if __name__ == '__main__' :
 
     missile_one = False
     dead_list = []
+    
     take_input()
     missile_impact_grid = [[1 for i in range(N)] for j in range(N)]
     static_soldier_count = M - 1
