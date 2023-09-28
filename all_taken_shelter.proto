@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+service All_Taken_Shelter{
+    rpc all_taken_shelter (taken_shelter_query) returns (taken_shelter_response){}
+}
+
+message taken_shelter_query
+{
+
+}
+
+message taken_shelter_response
+{
+    bool taken_shelter = 1;
+    int64 live_soldier_count = 2;
+}

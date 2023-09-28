@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+service Send_Commander_Index{
+    rpc send_commander_index(new_commander_index) returns (commander_details){}
+}
+
+message new_commander_index
+{
+    int64 commander_index = 1;
+}
+
+message commander_details
+{
+    
+}
