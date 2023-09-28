@@ -457,8 +457,8 @@ if __name__ == '__main__' :
             continue
         # time.sleep(1)
         # create logical timer
-        logging.debug("Time elapsed {} seconds".format(t))
-        print("Time elapsed {} seconds".format(t))
+        logging.debug("Time elapsed {} seconds".format(game_timestamp))
+        print("Time elapsed {} seconds".format(game_timestamp))
         game_timestamp += t
         
         status_all()
@@ -493,8 +493,8 @@ if __name__ == '__main__' :
                 logging.debug("Missile Fired !")
                 last_missile_timestamp = time.time()
         
-    logging.debug("Time elapsed {} seconds".format(t))
-    print("Time elapsed {} seconds".format(t))
+    logging.debug("Time elapsed {} seconds".format(game_timestamp))
+    print("Time elapsed {} seconds".format(game_timestamp))
 
     if can_fire_missile_response.live_soldier_count != 0:
         status_all()
