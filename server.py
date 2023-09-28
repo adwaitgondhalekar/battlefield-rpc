@@ -16,7 +16,7 @@ import game_over_pb2, game_over_pb2_grpc
 from concurrent import futures
 from colorama import Fore, Back, Style
 
-
+ip_addr = '172.17.84.99'
 
 
 
@@ -74,7 +74,7 @@ class Get_Valid_Position(rpc1.Get_Valid_PositionServicer):
         soldier_position_list[soldier_num] = (final_x_pos, final_y_pos)
         return response  # commander returning a valid position where soldier can take shelter
 
-rpc_list = [(Get_Valid_Position(), '[::]:50051',rpc1.add_Get_Valid_PositionServicer_to_server), (Get_Params_Client(), '[::]:50052', rpc2.add_Get_Params_ClientServicer_to_server)]
+rpc_list = [(Get_Valid_Position(), 'localhost:50051',rpc1.add_Get_Valid_PositionServicer_to_server), (Get_Params_Client(), 'localhost:50052', rpc2.add_Get_Params_ClientServicer_to_server)]
 
 
 def create_servers():
@@ -194,7 +194,7 @@ def assign_initial_state():
         battlefield[it[0]][it[1]] = 1 
 
 def call_game_over():
-    with grpc.insecure_channel('[::]:40056') as channel:
+    with grpc.insecure_channel(ip_addr + ':40056') as channel:
         global is_client_game_over
         stub = game_over_pb2_grpc.Game_OverStub(channel)
         response = stub.game_over(game_over_pb2.game_over_req())
@@ -228,12 +228,12 @@ def elect_commander():
     battlefield[x][y] = 3   # marked commander in the battlefield
     
 def send_new_commander():
-    with grpc.insecure_channel('[::]:40055') as channel:
+    with grpc.insecure_channel(ip_addr + ':40055') as channel:
         stub = send_commander_index_pb2_grpc.Send_Commander_IndexStub(channel)
         response = stub.send_commander_index(send_commander_index_pb2.new_commander_index(commander_index = commander_index))
 
 def create_soldier_process():
-    with grpc.insecure_channel('[::]:40051') as channel:
+    with grpc.insecure_channel(ip_addr + ':40051') as channel:
         stub = create_soldier_pb2_grpc.Create_SoldierStub(channel)
 
         soldier_list = []
@@ -247,7 +247,7 @@ def create_soldier_process():
         print(response.msg)
 
 def can_fire_missile():
-    with grpc.insecure_channel('[::]:40053') as channel:
+    with grpc.insecure_channel(ip_addr + ':40053') as channel:
         stub = all_taken_shelter_pb2_grpc.All_Taken_ShelterStub(channel)
         response = stub.all_taken_shelter(all_taken_shelter_pb2.taken_shelter_query())
         return response
@@ -256,7 +256,7 @@ def status_all():
     for i in range(M):
         if i == commander_index:
             continue
-        with grpc.insecure_channel('[::]:40054') as channel:
+        with grpc.insecure_channel(ip_addr + ':40054') as channel:
             stub = status_pb2_grpc.StatusStub(channel)
             response = stub.status(status_pb2.status_request(soldier_id = i))
         liveness_list[i] = 1 if response.alive else 0
@@ -465,7 +465,7 @@ if __name__ == '__main__' :
         
         # rpc call to missile_approaching
         if can_fire_missile_response.live_soldier_count != 0:
-            with grpc.insecure_channel('[::]:40052') as channel:
+            with grpc.insecure_channel(ip_addr + ':40052') as channel:
                 stub = missile_approaching_pb2_grpc.Missile_ApproachingStub(channel)
                 stub.missile_approaching(missile_approaching_pb2.missile(x_pos = missile_x_pos, y_pos = missile_y_pos, hit_time = round(time.time() - start_timestamp), missile_type = missile_type))
                 print("Missile Fired !")

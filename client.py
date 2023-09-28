@@ -18,7 +18,7 @@ import game_over_pb2
 import game_over_pb2_grpc as rpc6
 from colorama import Fore, Back, Style
 
-
+ip_addr = '172.17.84.246'
 
 take_shelter_lock = multiprocessing.Lock()
 
@@ -42,7 +42,7 @@ is_game_over = False
 
 def get_params():
     global N, M
-    with grpc.insecure_channel('[::]:50052') as channel:
+    with grpc.insecure_channel(ip_addr + ':50052') as channel:
         stub = get_params_client_pb2_grpc.Get_Params_ClientStub(channel)
         response = stub.get_params_client(get_params_client_pb2.params_request())
 
@@ -51,7 +51,7 @@ def get_params():
 
 
 def valid_position_getter(available_pos):
-    with grpc.insecure_channel('[::]:50051') as channel:
+    with grpc.insecure_channel(ip_addr + ':50051') as channel:
         stub = get_valid_position_pb2_grpc.Get_Valid_PositionStub(channel)
 
         available_pos_list = []
@@ -299,7 +299,7 @@ class Game_Over(rpc6.Game_OverServicer):
             is_game_over_2.value = 1
         return game_over_pb2.game_over_response(client_game_over = True)
 
-rpc_list = [(Create_Soldier(), '[::]:40051', rpc1.add_Create_SoldierServicer_to_server), (Missile_Approaching(), '[::]:40052', rpc2.add_Missile_ApproachingServicer_to_server),(All_Taken_Shelter(),'[::]:40053',rpc3.add_All_Taken_ShelterServicer_to_server), (Status(), '[::]:40054', rpc4.add_StatusServicer_to_server), (Send_Commander_Index(), '[::]:40055', rpc5.add_Send_Commander_IndexServicer_to_server), (Game_Over(), '[::]:40056', rpc6.add_Game_OverServicer_to_server)]
+rpc_list = [(Create_Soldier(),'localhost:40051', rpc1.add_Create_SoldierServicer_to_server), (Missile_Approaching(), 'localhost:40052', rpc2.add_Missile_ApproachingServicer_to_server),(All_Taken_Shelter(),'localhost:40053',rpc3.add_All_Taken_ShelterServicer_to_server), (Status(),'localhost:40054', rpc4.add_StatusServicer_to_server), (Send_Commander_Index(),'localhost:40055', rpc5.add_Send_Commander_IndexServicer_to_server), (Game_Over(),'localhost:40056', rpc6.add_Game_OverServicer_to_server)]
 
 if __name__ == '__main__':
     create_servers()
