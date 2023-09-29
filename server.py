@@ -17,7 +17,7 @@ import logging
 from concurrent import futures
 from colorama import Fore, Back, Style
 
-others_ip_addr = '172.17.84.246'
+others_ip_addr = '172.17.84.247'
 own_ip_addr = '172.17.84.246'
 
 N, M, t, T, commander_index, missile_x_pos, missile_y_pos, missile_type= None, None, None, None, None, None, None, None
