@@ -43,7 +43,7 @@ python3 client.py
 
 After this the "client.py" starts execution and the simulated soldiers except for the commander are spawned, wherein for every incoming missile the soldiers try to take shelter by repositioning themselves.
 
-#Authors
+## Authors
 
 * **Ritwik Basak**
 * **Adwait Gondhalekar**
